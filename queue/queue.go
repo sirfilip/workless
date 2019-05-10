@@ -62,14 +62,19 @@ type JobQueue struct {
 }
 
 func (self *JobQueue) Start() {
-	// TODO add catch all to make sure that the worker gorutine keeps running on error
+	log.Printf("Starting queue %v ...", self.name)
 	for i := 0; i < cap(self.buffer); i++ {
 		client := redis.NewClient(self.options)
 		_, err := client.Ping().Result()
 		if err != nil {
 			panic(err)
 		}
-		go func(client *redis.Client) {
+		go func(worker int, client *redis.Client) {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Printf("Error: worker(%v) recover: %v", worker, err)
+				}
+			}()
 			defer client.Close()
 			for {
 				select {
@@ -80,14 +85,21 @@ func (self *JobQueue) Start() {
 							// TODO: update stats
 							log.Printf("Error while executing job: %v", err)
 						} else {
-							client.LRem(ProcessingQueue(self.name), 1, jobSpec.ID)
+							if err := client.Del(JobID(self.name, jobSpec.ID)).Err(); err != nil {
+								log.Printf("Error removing job: %v", err)
+							}
+							if err := client.LRem(ProcessingQueue(self.name), 1, jobSpec.ID).Err(); err != nil {
+								log.Printf("Error removing job from the processing list: %v", err)
+							}
 						}
 					}
 				case <-self.done:
 					return
 				default:
 					if res, err := client.BRPopLPush(PendingQueue(self.name), ProcessingQueue(self.name), 10*time.Second).Result(); err != nil {
-						log.Printf("Error while fetching next job: %v", err)
+						if err != redis.Nil {
+							log.Printf("Error while fetching next job: %v", err)
+						}
 						continue
 					} else {
 						if res == "" {
@@ -110,15 +122,18 @@ func (self *JobQueue) Start() {
 					}
 				}
 			}
-		}(client)
+		}(i, client)
 	}
+	log.Printf("Queue %v started", self.name)
 }
 
 // Stop stops the channel from processing jobs
 func (self *JobQueue) Stop() {
+	log.Printf("Stopping queue %v ...", self.name)
 	for i := 0; i < cap(self.buffer); i++ {
 		self.done <- 1
 	}
+	log.Print("Bye")
 }
 
 // NewJobQueue JobQueue constructor

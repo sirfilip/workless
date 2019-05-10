@@ -28,7 +28,7 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 
 	queue.RegisterWorker("Hello", helloWorld)
-	jobQueue := queue.NewJobQueue("hello", 5, &redis.Options{
+	jobQueue := queue.NewJobQueue("hello", 100, &redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
