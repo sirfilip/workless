@@ -85,56 +85,37 @@ func (self *JobQueue) Start() {
 					}
 				case <-self.done:
 					return
+				default:
+					if res, err := client.RPopLPush(PendingQueue(self.name), ProcessingQueue(self.name)).Result(); err != nil {
+						// log.Printf("Error while fetching next job: %v", err)
+						continue
+					} else {
+						if res == "" {
+							continue
+						}
+						log.Printf("Got payload: %v", res)
+						if payload, err := client.Get(JobID(self.name, res)).Result(); err != nil {
+							log.Printf("Error while getting payload: %v", err)
+						} else {
+							jobSpec := &JobSpec{}
+							err := json.Unmarshal([]byte(payload), jobSpec)
+							if err != nil {
+								// log the error
+								log.Printf("Error while unmarshaling payload: %v", err)
+							} else {
+								log.Printf("Sending Job Spec: %v", jobSpec)
+								self.buffer <- jobSpec
+							}
+						}
+					}
 				}
 			}
 		}(client)
 	}
-
-	client := redis.NewClient(self.options)
-	_, err := client.Ping().Result()
-	if err != nil {
-		panic(err)
-	}
-	go func(client *redis.Client) {
-		defer client.Close()
-		for {
-
-			select {
-			case <-self.stop:
-				return
-			default:
-			}
-
-			if res, err := client.RPopLPush(PendingQueue(self.name), ProcessingQueue(self.name)).Result(); err != nil {
-				// log.Printf("Error while fetching next job: %v", err)
-				continue
-			} else {
-				if res == "" {
-					continue
-				}
-				log.Printf("Got payload: %v", res)
-				if payload, err := client.Get(JobID(self.name, res)).Result(); err != nil {
-					log.Printf("Error while getting payload: %v", err)
-				} else {
-					jobSpec := &JobSpec{}
-					err := json.Unmarshal([]byte(payload), jobSpec)
-					if err != nil {
-						// log the error
-						log.Printf("Error while unmarshaling payload: %v", err)
-					} else {
-						log.Printf("Sending Job Spec: %v", jobSpec)
-						self.buffer <- jobSpec
-					}
-				}
-			}
-		}
-	}(client)
 }
 
 // Stop stops the channel from processing jobs
 func (self *JobQueue) Stop() {
-	self.stop <- 1
-
 	for i := 0; i < cap(self.buffer); i++ {
 		self.done <- 1
 	}
@@ -144,12 +125,10 @@ func (self *JobQueue) Stop() {
 func NewJobQueue(name string, capacity int, redisOptions *redis.Options) *JobQueue {
 	buffer := make(chan *JobSpec, capacity)
 	done := make(chan int, capacity)
-	stop := make(chan int)
 	return &JobQueue{
 		name:    name,
 		options: redisOptions,
 		buffer:  buffer,
 		done:    done,
-		stop:    stop,
 	}
 }
