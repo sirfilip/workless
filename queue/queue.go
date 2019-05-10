@@ -58,6 +58,7 @@ type JobQueue struct {
 	options *redis.Options
 	buffer  chan *JobSpec
 	done    chan int
+	stop    chan int
 }
 
 func (self *JobQueue) Start() {
@@ -97,6 +98,13 @@ func (self *JobQueue) Start() {
 	go func(client *redis.Client) {
 		defer client.Close()
 		for {
+
+			select {
+			case <-self.stop:
+				return
+			default:
+			}
+
 			if res, err := client.RPopLPush(PendingQueue(self.name), ProcessingQueue(self.name)).Result(); err != nil {
 				// log.Printf("Error while fetching next job: %v", err)
 				continue
@@ -125,6 +133,8 @@ func (self *JobQueue) Start() {
 
 // Stop stops the channel from processing jobs
 func (self *JobQueue) Stop() {
+	self.stop <- 1
+
 	for i := 0; i < cap(self.buffer); i++ {
 		self.done <- 1
 	}
@@ -134,10 +144,12 @@ func (self *JobQueue) Stop() {
 func NewJobQueue(name string, capacity int, redisOptions *redis.Options) *JobQueue {
 	buffer := make(chan *JobSpec, capacity)
 	done := make(chan int, capacity)
+	stop := make(chan int)
 	return &JobQueue{
 		name:    name,
 		options: redisOptions,
 		buffer:  buffer,
 		done:    done,
+		stop:    stop,
 	}
 }
