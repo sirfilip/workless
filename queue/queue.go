@@ -86,8 +86,8 @@ func (self *JobQueue) Start() {
 				case <-self.done:
 					return
 				default:
-					if res, err := client.RPopLPush(PendingQueue(self.name), ProcessingQueue(self.name)).Result(); err != nil {
-						// log.Printf("Error while fetching next job: %v", err)
+					if res, err := client.BRPopLPush(PendingQueue(self.name), ProcessingQueue(self.name), 10*time.Second).Result(); err != nil {
+						log.Printf("Error while fetching next job: %v", err)
 						continue
 					} else {
 						if res == "" {
