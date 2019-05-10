@@ -14,11 +14,13 @@ type Job func(...interface{}) error
 
 // JobSpec json serialilzed job information
 type JobSpec struct {
-	ID         string        `json:"id"`          // Job ID
-	Name       string        `json:"name"`        // Name of the handler
-	Payload    []interface{} `json:"payload"`     // The payload of the job
-	Status     int           `json:"status"`      // Status pending, processed failed
-	ExecutedAt time.Time     `json:"executed_at"` // Last time this job was executed
+	ID          string        `json:"id"`           // Job ID
+	Name        string        `json:"name"`         // Name of the handler
+	Duration    int           `json:"duration"`     // Duration in seconds
+	Attempts    int           `json:"attempts"`     // Number of retries
+	ScheduledAt time.Time     `json:"scheduled_at"` // Execute not sooner then
+	ExecutedAt  time.Time     `json:"executed_at"`  // Last time this job was executed
+	Payload     []interface{} `json:"payload"`      // The payload of the job
 }
 
 var workers map[string]Job

@@ -20,7 +20,7 @@ func main() {
 		names = append(names, fmt.Sprintf("Player num: %v", i))
 	}
 	for _, name := range names {
-		err := c.Schedule("hello", "Hello", name)
+		err := c.Schedule("hello", "Hello", 1, name)
 		if err != nil {
 			panic(err)
 		}
