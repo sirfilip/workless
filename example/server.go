@@ -33,7 +33,7 @@ func main() {
 		Password: "",
 		DB:       0,
 	})
-	jobQueue.Start()
+	jobQueue.Work()
 
 	<-c
 	jobQueue.Stop()

@@ -63,7 +63,8 @@ type JobQueue struct {
 	stop    chan int
 }
 
-func (self *JobQueue) Start() {
+// Work starts working
+func (self *JobQueue) Work() {
 	log.Printf("Starting queue %v ...", self.name)
 	for i := 0; i < cap(self.buffer); i++ {
 		client := redis.NewClient(self.options)
@@ -71,6 +72,7 @@ func (self *JobQueue) Start() {
 		if err != nil {
 			panic(err)
 		}
+		// worker
 		go func(worker int, client *redis.Client) {
 			defer func() {
 				if err := recover(); err != nil {
